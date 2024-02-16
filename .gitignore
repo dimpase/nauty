@@ -1,0 +1,10 @@
+*
+!*.c
+!*.h
+!*.ac
+!*.in
+!.gitignore
+!*.txt
+!*.ans
+!REA
+nauty.h

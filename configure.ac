@@ -164,8 +164,6 @@ CFLAGS=$user_cflags
 MORECFLAGS=""
 dnl  we need  AC_SYS_LARGEFILE and AC_FUNC_FSEEKO
 AC_SYS_LARGEFILE
-AS_IF([test "x$ac_cv_sys_file_offset_bits" = xno],[ac_cv_sys_file_offset_bits=0])
-AC_SUBST(ac_cv_sys_file_offset_bits)
 
 AS_IF([test "x$user_cflags" = x || test "x$user_cflags" = x-m32],
 [
