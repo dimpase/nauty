@@ -8,4 +8,4 @@ Description: Programs and library for graph isomorphism
 Version: @PACKAGE_VERSION@
 Libs: -L${libdir} LIBS
 Libs.private:
-Cflags: -I${includedir} CFLGS
+Cflags: -I${includedir} CFLGS @LARGEFILECFLAGS@

@@ -161,9 +161,16 @@ dnl Checks for C compiler and sets CFLAGS if not set by user
 user_cflags="$CFLAGS"
 AC_PROG_CC
 CFLAGS=$user_cflags
-MORECFLAGS=""
-dnl  we need  AC_SYS_LARGEFILE and AC_FUNC_FSEEKO
+LARGEFILECFLAGS=""
 AC_SYS_LARGEFILE
+AS_CASE([$ac_cv_sys_largefile_opts],
+  ["none needed"], [],
+  ["support not detected"], [],
+  dnl otherwise it is a compiler flag
+  [LARGEFILECFLAGS="$ac_cv_sys_largefile_opts"]
+  )
+MORECFLAGS="$LARGEFILECFLAGS"
+
 
 AS_IF([test "x$user_cflags" = x || test "x$user_cflags" = x-m32],
 [
@@ -409,6 +416,7 @@ AS_IF([test "$allow_native" -eq 1],
          )
 ])
 
+AC_SUBST(LARGEFILECFLAGS)
 AC_SUBST(MORECFLAGS)
 
 echo CC="$CC"
