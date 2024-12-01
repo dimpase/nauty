@@ -1,8 +1,8 @@
 /* hamheuristic.c
-   Version 1.1  July 2023.  Brendan McKay
+   Version 1.2  Jan 2024.  Brendan McKay
 */
 
-#define USAGE "hamheuristic [-sgu] [-vq] [-L#] [-t#] [infile [outfile]]"
+#define USAGE "hamheuristic [-sgu] [-vq] [-V] [-L#] [-t#] [infile [outfile]]"
 
 #define HELPTEXT \
 " Apply a heuristic for finding hamiltonian cycles.\n\
@@ -13,6 +13,7 @@
         If neither -s or -g are given, the output format is\n\
         determined by the header or, if there is none, by the\n\
         format of the first input graph.\n\
+    -V  Write those for which a cycle (path with -p) is found instead\n\
     -u  Suppress output to outfile, give statistics instead.\n\
 \n\
     The output file will have a header if and only if the input file does.\n\
@@ -262,7 +263,8 @@ main(int argc, char *argv[])
     int argnum,i,j,outcode,tvalue;
     char *arg,sw;
     boolean badargs;
-    boolean pswitch,sswitch,gswitch,qswitch,Lswitch,tswitch,vswitch,uswitch;
+    boolean pswitch,sswitch,gswitch,qswitch,Lswitch;
+    boolean Vswitch,tswitch,vswitch,uswitch;
     long Lvalue;
     double t;
     char *infilename,*outfilename;
@@ -276,7 +278,7 @@ main(int argc, char *argv[])
     INITRANBYTIME;
 
     uswitch = sswitch = gswitch = Lswitch = qswitch = FALSE;
-    pswitch = vswitch = tswitch = FALSE;
+    pswitch = vswitch = tswitch = Vswitch = FALSE;
     infilename = outfilename = NULL;
 
     argnum = 0;
@@ -296,6 +298,7 @@ main(int argc, char *argv[])
                 else SWBOOLEAN('p',pswitch)
                 else SWBOOLEAN('q',qswitch)
                 else SWBOOLEAN('v',vswitch)
+                else SWBOOLEAN('V',Vswitch)
                 else SWLONG('L',Lswitch,Lvalue,"-L")
                 else SWINT('t',tswitch,tvalue,"-t")
                 else badargs = TRUE;
@@ -325,13 +328,14 @@ main(int argc, char *argv[])
     if (!qswitch)
     {
         fprintf(stderr,">A hamheuristic");
-        if (pswitch || sswitch || gswitch || vswitch 
+        if (pswitch || sswitch || gswitch || vswitch || Vswitch
                     || uswitch || tswitch || Lswitch)
             fprintf(stderr," -");
         if (sswitch) fprintf(stderr,"s");
         if (gswitch) fprintf(stderr,"g");
         if (uswitch) fprintf(stderr,"u");
         if (vswitch) fprintf(stderr,"v");
+        if (Vswitch) fprintf(stderr,"V");
         if (pswitch) fprintf(stderr,"p");
         if (Lswitch) fprintf(stderr,"L%ld",Lvalue);
         if (tswitch) fprintf(stderr,"t%d",tvalue);
@@ -395,7 +399,8 @@ main(int argc, char *argv[])
         else if (status == YES) ++nYES;
         else ++nTIMEOUT;
 
-        if (status != YES && !uswitch)
+        if (!uswitch && ((Vswitch && status == YES) ||
+                         (!Vswitch && status != YES)))
         {
             if (outcode == SPARSE6) writes6_sg(outfile,&sg);
             else if (outcode == GRAPH6) writeg6_sg(outfile,&sg);

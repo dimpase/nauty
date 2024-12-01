@@ -1,8 +1,7 @@
-/* shortg.c  version 3.2; B D McKay, Sep 17 2018. */
+/* shortg.c  version 3.3; B D McKay, Apr 13, 2024. */
 
 #include "gtools.h" 
 #include "nautinv.h"
-#include "gutils.h"
 #include "traces.h"
 
 #if SORT_SIZE
@@ -57,16 +56,22 @@
         member of each nontrivial isomorphism class is written,\n\
         with canonical labelling.\n\
 \n\
-    -fxxx  Specify a partition of the point set.  xxx is any\n\
+    -fxxx  Specify a partition of the vertex set.  xxx is any\n\
         string of ASCII characters except nul.  This string is\n\
         considered extended to infinity on the right with the\n\
-        character 'z'.  One character is associated with each point,\n\
-        in the order given.  The labelling used obeys these rules:\n\
-         (1) the new order of the points is such that the associated\n\
+        character 'z'. The sequence 'x^N', where x is a character and N is\n\
+        a number, is equivalent to writing 'x' N times.  One character is\n\
+        associated with each vertex, in the order given.  The labelling\n\
+        used obeys these rules:\n\
+         (1) the new order of the vertices is such that the associated\n\
         characters are in ASCII ascending order\n\
          (2) if two graphs are labelled using the same string xxx,\n\
         the output graphs are identical iff there is an\n\
         associated-character-preserving isomorphism between them.\n\
+        If a leading '-' is used, as in -f-xxx, the characters are\n\
+        assigned to the vertices starting at the last vertex, and\n\
+        the new order of the vertices respects decreasing ASCII order.\n\
+\n\
     -i#  select an invariant (1 = twopaths, 2 = adjtriang(K), 3 = triples,\n\
         4 = quadruples, 5 = celltrips, 6 = cellquads, 7 = cellquins,\n\
         8 = distances(K), 9 = indsets(K), 10 = cliques(K), 11 = cellcliq(K),\n\
@@ -81,7 +86,6 @@
         space by the sort subprocess.  The default is usually /tmp.\n" \
 SIZEHELP \
 "    -q  Suppress auxiliary output\n"
-
 
 /*************************************************************************/
 
@@ -393,8 +397,8 @@ main(int argc, char *argv[])
         gt_abort(">E shortg: -sgzk are incompatible\n");
     if (Tswitch && *tempdir == '\0')
         gt_abort(">E shortg: -T needs a non-empty argument\n");
-    if (tswitch && (format || Sswitch))
-        gt_abort(">E shortg: -t is incompatible with -S and -f \n");
+    if (tswitch && Sswitch)
+        gt_abort(">E shortg: -t is incompatible with -S \n");
     if (iswitch && (inv > 16))
         gt_abort(">E shortg: -i value must be 0..16\n");
     if (Sswitch && iswitch && invarproc[inv].entrypoint_sg == NULL)
@@ -526,6 +530,7 @@ main(int argc, char *argv[])
         traces_opts.writeautoms = FALSE;
         traces_opts.verbosity = 0;
         traces_opts.outfile = stdout;
+        traces_opts.defaultptn = FALSE;
 
         while (TRUE)
         {   
@@ -549,8 +554,7 @@ main(int argc, char *argv[])
             }
             else
             {
-                for (ii = 0; ii < n; ++ii) { lab[ii] = ii; ptn[ii] = 1; }
-                ptn[n-1] = 0;
+                setlabptnfmt(fmt,lab,ptn,NULL,0,n);
                 Traces(&sg,lab,ptn,orbits,&traces_opts,&traces_stats,&sh);
                 sortlists_sg(&sh);
             }
@@ -564,10 +568,10 @@ main(int argc, char *argv[])
     {
         while (TRUE)
         {
-            if ((g = readgg(infile,NULL,0,&m,&n,&digraph)) == NULL) break;
+            if ((g = readg_loops(infile,
+                             NULL,0,&m,&n,&loops,&digraph)) == NULL) break;
             dstr = readg_line;
             ++numread;
-            loops = loopcount(g,m,n);
 #if !MAXN
             DYNALLOC2(graph,h,h_sz,n,m,"shortg");
 #endif

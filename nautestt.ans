@@ -8,5 +8,5 @@
         114 graphs : chrom=8
           9 graphs : chrom=9
           1 graphs : chrom=10
- 126758 graphs altogether; cpu=0.07 sec
+ 126758 graphs altogether; cpu=0.09 sec
 >A ./countg --N

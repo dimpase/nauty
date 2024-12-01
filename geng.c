@@ -3,7 +3,7 @@
  *        rigid + unique point = rigid
  */
 
-/* geng.c  version 3.6; B D McKay, October 2022. */
+/* geng.c  version 3.7; B D McKay, April 2024. */
 
 #define USAGE \
 "geng [-cCmtfkbd#D#] [-kTSPF] [-uygsnh] [-lvq] \n\
@@ -29,6 +29,8 @@
      -F    : only generate claw-free graphs\n\
      -b    : only generate bipartite graphs\n\
                 (-t, -f and -b can be used in any combination)\n\
+		The combination -bT gives bipartite graphs with no\n\
+                  induced cycles longer than 4-cycles.\n\
      -m    : save memory at the expense of time (only makes a\n\
                 difference in the absence of -b, -t, -f and n <= 28).\n\
      -d#   : a lower bound for the minimum degree\n\
@@ -1565,6 +1567,55 @@ notchordal(graph *g, int n, int maxn)
 }
 
 static boolean
+hasinducedpath5(graph *g, int start, setword body, setword last)
+/* return TRUE if there is an induced path in g starting at start,
+   extravertices within body and ending in last.
+ * {start}, body and last should be disjoint. */
+{
+    setword gs,w;
+    int i;
+
+    gs = g[start];
+
+    w = gs & body;
+    while (w)
+    {
+        TAKEBIT(i,w);
+        if (hasinducedpath(g,i,body&~gs,last&~bit[i]&~gs))
+            return TRUE;
+    }
+
+    return FALSE;
+}
+
+static boolean
+notchordal5(graph *g, int n, int maxn)
+/* g is a graph of order n. Return TRUE if there is a
+   chordless cycle of length at least 5 that includes
+   the last vertex. */
+{
+    setword all,gn,gs;
+    int v,s;
+
+    all = ALLMASK(n);
+    gn = g[n-1];
+
+    while (gn)
+    {
+        TAKEBIT(v,gn);
+        gs = g[v] & ~(bit[n-1]|g[n-1]);
+        while (gs)
+        {
+            TAKEBIT(s,gs);
+            if (hasinducedpath5(g,s,all&~(g[n-1]|g[v]),gn&~g[v]))
+                return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+static boolean
 notsplit(graph *g, int n, int maxn)
 /* g is a graph of order n. Return TRUE if either g or its
    complement has a chordless cycle of length at least 4 that
@@ -2163,7 +2214,8 @@ spaextend(graph *g, int n, int *deg, int ne, boolean rigid,
     if (xlb > xub) return;
 
     if (splitgraph && notsplit(g,n,maxn)) return;
-    if (chordal && notchordal(g,n,maxn)) return;
+    if (chordal && ((bipartite && notchordal5(g,n,maxn))
+                  || (!bipartite && notchordal(g,n,maxn)))) return;
     if (perfect && notperfect(g,n,maxn)) return;
 #ifdef PRUNE
     if (PRUNE(g,n,maxn)) return;
@@ -2191,7 +2243,8 @@ spaextend(graph *g, int n, int *deg, int ne, boolean rigid,
                           (connec>1 && isbiconnected(gx,nx))))
                 {
                     if (splitgraph && notsplit(gx,nx,maxn)) continue;
-                    if (chordal && notchordal(gx,nx,maxn)) continue;
+		    if (chordal && ((bipartite && notchordal5(gx,nx,maxn))
+			  || (!bipartite && notchordal(gx,nx,maxn)))) continue;
                     if (perfect && notperfect(gx,nx,maxn)) continue;
 #ifdef PRUNE
                     if (!PRUNE(gx,nx,maxn))
@@ -2286,7 +2339,8 @@ genextend(graph *g, int n, int *deg, int ne, boolean rigid, int xlb, int xub)
     if (xlb > xub) return;
 
     if (splitgraph && notsplit(g,n,maxn)) return;
-    if (chordal && notchordal(g,n,maxn)) return;
+    if (chordal && ((bipartite && notchordal5(g,n,maxn))
+	  || (!bipartite && notchordal(g,n,maxn)))) return;
     if (perfect && notperfect(g,n,maxn)) return;
 #ifdef PRUNE 
     if (PRUNE(g,n,maxn)) return; 
@@ -2313,7 +2367,8 @@ genextend(graph *g, int n, int *deg, int ne, boolean rigid, int xlb, int xub)
                             || (connec>1 && isbiconnected(gx,nx)))
                 {
                     if (splitgraph && notsplit(gx,nx,maxn)) continue;
-                    if (chordal && notchordal(gx,nx,maxn)) continue;
+		    if (chordal && ((bipartite && notchordal5(gx,nx,maxn))
+		        || (!bipartite && notchordal(gx,nx,maxn)))) continue;
                     if (perfect && notperfect(gx,nx,maxn)) continue;
 #ifdef PRUNE
                     if (!PRUNE(gx,nx,maxn))
@@ -2518,15 +2573,15 @@ PLUGIN_SWITCHES
     }
 
     if (trianglefree || squarefree || bipartite) k4free = FALSE;
-    if (bipartite) perfect = FALSE;  /* bipartite graphs are perfect */
-    if (splitgraph) chordal = perfect = FALSE; /* split graphs are chordal */
-    if (chordal) perfect = FALSE;  /* chordal graphs are perfect */
+    if (bipartite || chordal) perfect = FALSE;
+		/* bipartite and chordal graphs are perfect */
+    if (splitgraph && !bipartite) chordal = perfect = FALSE;
+		/* split graphs are chordal */
     if (clawfree && bipartite)
     {
         clawfree = FALSE;
         if (maxdeg > 2) maxdeg = 2;
     }
-    if (chordal && bipartite && maxe >= maxn) maxe = maxn - 1;
     if (splitgraph && bipartite && maxe >= maxn) maxe = maxn - 1;
 
     if (connec1 && mindeg < 1 && maxn > 1) mindeg = 1;

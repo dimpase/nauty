@@ -382,20 +382,6 @@ isstrong(graph *g, int n)
 /**********************************************************************/
 
 static void
-gcomplement(graph *g, graph *gc, int n)
-/* Take the complement of g and put it in gc */
-{
-    int i;
-    setword all;
-
-    all = ~(setword)BITMASK(n-1);
-    for (i = 0; i < n; ++i)
-        gc[i] = g[i] ^ all ^ bit[i];
-}
-
-/**************************************************************************/
-
-static void
 makeleveldata(void)
 /* make the level data for each level */
 {

@@ -1,5 +1,5 @@
-/* splay.c  - code for splay trees    Version of August 18, 2001.
- * Author: Brendan McKay  bdm@cs.anu.edu.au
+/* splay.c  - code for splay trees    Version of March 23, 2024
+ * Author: Brendan McKay  brendan.mckay@anu.edu.au
 
    This file is not meant to be compiled separately, but to be
    #included into other programs.  Use it like this:
@@ -10,22 +10,29 @@
    Also define a macro SPLAYNODESIZE giving the size of an object
    of type SPLAYNODE, unless  sizeof(SPLAYNODE) is adequate.
 
-   2. Declare a variable of type SPLAYNODE* to point to the root
+   2. Optionally declare SPLAY_ALLOC so that SPLAY_ALLOC(SPLAYNODESIZE)
+   allocates an object of type SPLAYNODE and returns its address, and
+   SPLAY_FREE so that SPLAY_FREE(ptr) frees an object allocated that way.
+   SPLAY_ALLOC should return NULL if allocation fails.
+   Either define both of these or neither. The defaults are
+   SPLAY_ALLOC=malloc and SPLAY_FREE=free.
+
+   3. Declare a pointer variable of type SPLAYNODE* to point to the root
    of the tree, and initialise it to NULL.
 
-   3. Declare SCAN_ARGS to be the additional arguments needed for
-   splay_scan(), including a leading comma.
+   4. Define SCAN_ARGS to be the additional arguments needed for
+   splay_scan(), including a leading comma unless there are no arguments.
 
-   4. Declare ACTION(p) for what splay_scan() should do for node p.
+   5. Define ACTION(p) for what splay_scan() should do for node p.
 
-   5. Declare INSERT_ARGS to be the additional arguments needed 
-   for splay_insert(), including a leading comma.
+   6. Define INSERT_ARGS to be the additional arguments needed for
+   splay_insert(), including a leading comma unless there are no arguments.
 
-   6. Declare LOOKUP_ARGS to be the additional arguments needed
-   for splay_lookup(), including a leading comma.  The default
-   for LOOKUP_ARGS is to be the same as INSERT_ARGS.
+   7. Optionally declare LOOKUP_ARGS to be the additional arguments needed
+   for splay_lookup(), including a leading comma unless there are no
+   arguments.  The default for LOOKUP_ARGS is to be the same as INSERT_ARGS.
 
-   7. Declare COMPARE(p) to compare INSERT_ARGS or LOOKUP_ARGS to the
+   8. Define COMPARE(p) to compare INSERT_ARGS or LOOKUP_ARGS to the
    contents of node p.  <0, 0, >0 if INSERT_ARGS is greater, equal,
    less, than p.  This has to be an expression with a value, so you will
    need to make it a procedure call if the comparison is complicated.
@@ -33,25 +40,25 @@
    If you are using something like strcmp, the correct order is
    strcmp( INSERT_ARGS, p ).
 
-   8. Declare PRESENT(p) for what to do if INSERT_ARGS is already
+   9. Define PRESENT(p) for what to do if INSERT_ARGS is already
    present, in node p.  There is a spare int variable i available.
    Typically, this might update some data in the node p.
 
-   9. Declare NOT_PRESENT(p) for what to do if INSERT_ARGS is not
+   10. Define NOT_PRESENT(p) for what to do if INSERT_ARGS is not
    in the tree and p is a fresh node to hold it.  No need to set
    the left, right, and parent fields.  Use i here too if you like.
    Typically, this might initialise the data in node p.
 
-        PRESENT(p) and NOT_PRESENT(p) should not manipulate the
-        tree pointers.  However, each of them can include a
-        return if you don't want to change the tree.  In the
-        case of NOT_PRESENT(p), do free(p) before returning.
+   PRESENT(p) and NOT_PRESENT(p) should not manipulate the tree pointers.
+   However, each of them can include a return if you don't want to change
+   the tree.  In the case of NOT_PRESENT(p), do SPLAY_FREE(p) before
+   returning.
 
-        In the case of PRESENT(p), it is also legal to delete the
-        node from the tree using SCAN_DELETE(to_root,p).  In that
-        case you MUST return immediately afterwards.
+   In the case of PRESENT(p), it is also legal to delete the node
+   from the tree using SCAN_DELETE(to_root,p). In that case you MUST
+   return immediately afterwards.
 
-  10. #include "splay.c"
+   11. #include "splay.c"
 
 
   Calls:
@@ -86,9 +93,9 @@
 
   It is possible to have splay trees of several types in the same
   program.  Just include "splay.c" several times, with the procedure
-  names SPLAY, SPLAY_SCAN, SPLAY_LOOKUP, SPLAY_INSERT, SPLAY_DELETE
-  defined to distinct names.  You have to redefine them all even if
-  you aren't using them all.
+  names SPLAY, SPLAY_SCAN, SPLAY_LOOKUP, SPLAY_INSERT, SPLAY_DELETE,
+  defined to distinct names (and SPLAY_ALLOC, SPLAY_FREE if you defined
+  them).  You have to redefine them all even if you aren't using them all.
 
   Threads:
 
@@ -121,6 +128,11 @@
 #define SPLAY_LOOKUP splay_lookup
 #define SPLAY_INSERT splay_insert
 #define SPLAY_DELETE splay_delete
+#endif
+
+#ifndef SPLAY_ALLOC
+#define SPLAY_ALLOC malloc
+#define SPLAY_FREE free
 #endif
 
 /*********************************************************************/
@@ -282,9 +294,9 @@ SPLAY_INSERT(SPLAYNODE **to_root  INSERT_ARGS)
         }
     }
 
-    if ((new_node = (SPLAYNODE*)malloc(SPLAYNODESIZE)) == NULL)
+    if ((new_node = (SPLAYNODE*)SPLAY_ALLOC(SPLAYNODESIZE)) == NULL)
     {
-        fprintf(stderr,">E malloc failed in splay_insert()\n");
+        fprintf(stderr,">E SPLAY_ALLOC failed in splay_insert()\n");
         exit(1);
     }
 
@@ -365,7 +377,7 @@ SPLAY_DELETE(SPLAYNODE **to_root, SPLAYNODE *p)
     {
         *to_root = p->left;
         if (p->left) p->left->parent = NULL;
-        free(p);
+        SPLAY_FREE(p);
         return;
     }
 
@@ -375,7 +387,7 @@ SPLAY_DELETE(SPLAYNODE **to_root, SPLAYNODE *p)
     {
         *to_root = p->right;
         p->right->parent = NULL;
-        free(p);
+        SPLAY_FREE(p);
         return;
     }  
 
@@ -393,7 +405,7 @@ SPLAY_DELETE(SPLAYNODE **to_root, SPLAYNODE *p)
      if (p->left) p->left->parent = q;
      if (p->right) p->right->parent = q;
      *to_root = q;
-     free(p);
+     SPLAY_FREE(p);
 }
 
 /*********************************************************************/

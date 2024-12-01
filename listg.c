@@ -24,6 +24,7 @@
           number of edges\n\
     -H  : write in HCP operations research format\n\
     -M  : write in Magma format\n\
+    -m  : write in Mathematica format\n\
     -W  : write matrix in Maple format\n\
     -L  : (only with -M or -W) write Laplacian rather than adjacency matrix\n\
     -S  : (only with -M or -W) write signless Laplacian not adjacency matrix\n\
@@ -404,6 +405,42 @@ putMagma(FILE *outfile, graph *g, int linelength, boolean digraph,
     fprintf(outfile,"]>;\n");
 }
 
+
+/**************************************************************************/
+
+static void
+putMathematica(FILE *outfile, graph *g, int linelength,
+         int m, int n, long index)
+{
+    int i,j;
+    set *gi;
+    boolean symm;
+    size_t count;
+
+    fprintf(outfile,"g%ld = Graph[Range[%d],{",index,n);
+
+    count = 0;
+    for (i = 0, gi = (set*)g; i < n; ++i, gi += m)
+    {
+        for (j = -1; (j = nextelement(gi,m,j)) >= 0; )
+        {
+            symm = ISELEMENT(g+m*j,i);  /* opposite exists */
+            if (j >= i || !symm)
+            {
+                ++count;
+                if (count > 1)
+                {
+                    if (count % 10 == 0) fprintf(outfile,",\n");
+                    else                fprintf(outfile,",");
+                }
+                if (symm) fprintf(outfile,"%d<->%d",i+1,j+1);
+                else      fprintf(outfile,"%d->%d",i+1,j+1);
+            }
+        }
+    }
+    fprintf(outfile,"}];\n");
+}
+
 /**************************************************************************/
 
 static void
@@ -525,7 +562,7 @@ main(int argc, char *argv[])
     long pval1,pval2;
     boolean fswitch,pswitch,cswitch,dswitch;
     boolean aswitch,lswitch,oswitch,Fswitch,Sswitch;
-    boolean Aswitch,eswitch,tswitch,qswitch;
+    boolean Aswitch,eswitch,tswitch,mswitch,qswitch;
     boolean sswitch,Mswitch,Wswitch,Lswitch,Eswitch;
     boolean bswitch,Gswitch,yswitch,Yswitch,Hswitch;
     int linelength;
@@ -533,7 +570,7 @@ main(int argc, char *argv[])
 
     HELP; PUTVERSION;
 
-    fswitch = pswitch = cswitch = dswitch = FALSE;
+    fswitch = pswitch = cswitch = dswitch = mswitch = FALSE;
     aswitch = lswitch = oswitch = Fswitch = FALSE;
     Aswitch = eswitch = tswitch = qswitch = Sswitch = FALSE;
     sswitch = Mswitch = Wswitch = Lswitch = Eswitch = FALSE;
@@ -567,6 +604,7 @@ main(int argc, char *argv[])
                 else SWBOOLEAN('G',Gswitch)
                 else SWBOOLEAN('q',qswitch)
                 else SWBOOLEAN('M',Mswitch)
+                else SWBOOLEAN('m',mswitch)
                 else SWBOOLEAN('W',Wswitch)
                 else SWBOOLEAN('L',Lswitch)
                 else SWBOOLEAN('S',Sswitch)
@@ -677,6 +715,10 @@ main(int argc, char *argv[])
                 putLaplacianMagma(outfile,g,linelength,Sswitch,m,n,pval1+nin-1);
             else
                 putMagma(outfile,g,linelength,digraph,m,n,pval1+nin-1);
+        }
+        else if (mswitch)
+        {
+            putMathematica(outfile,g,linelength,m,n,pval1+nin-1);
         }
         else if (Wswitch)
         {

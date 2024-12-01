@@ -1,6 +1,7 @@
-/* assembleg.c  version 1.2; B D McKay, Nov 2023. */
+/* assembleg.c  version 1.3; B D McKay, Mar 2024. */
 
-#define USAGE "assembleg -n#|-n#:# [-i#|i#:#] [-L] [-q] [infile [outfile]]"
+#define USAGE \
+ "assembleg -n#|-n#:# [-i#|i#:#] [-k#|k#:#] [-L] [-q] [-c] [infile [outfile]]"
 
 #define HELPTEXT \
 " Assemble input graphs as components of output graphs.\n\
@@ -17,11 +18,13 @@
 \n\
     -n# -n#:#  Give range of output sizes (compulsory)\n\
     -i# -i#:#  Give range of input sizes to use\n\
+    -k# -k#:#  How many input graphs to combine (default -k2:)\n\
     -L  Assume all input graphs strictly larger than maxn/2\n\
          vertices follow any smaller graphs in the input,\n\
          where maxn is the largest size specified by -n.\n\
          This can greatly reduce memory consumption.\n\
     -c  Also write graphs consisting of a single input\n\
+         (equivalent to -k1:, overridden by -k)\n\
     -u  Generate the graphs but don't write them\n\
     -q  Suppress auxiliary information.\n"
 
@@ -173,20 +176,22 @@ readsomeinputs(FILE *f, int imin, int imax, int maxsize,
 /**************************************************************************/
 
 static void
-assemble(graph *g, int nmin, int nmax, int sofar, int lastpos,
-          boolean writeconn, FILE *outfile)
+assemble(graph *g, int nmin, int nmax, int nsofar, int ksofar,
+         int lastpos, int kmin, int kmax, FILE *outfile)
 /* Recursively add one more graph.
-   sofar = how many vertices so far. */
+   nsofar = how many vertices so far.
+   ksofar = how many parts so far.
+*/
 {
     int pos,newsize;
 
     for (pos = lastpos; pos < ninputs; ++pos)
     {
-        newsize = sofar + size[pos];
+        newsize = nsofar + size[pos];
         if (newsize > nmax) break;
 
-        insertg(g,sofar,gin[pos],size[pos],nmax);
-        if (newsize >= nmin && (sofar > 0 || writeconn))
+        insertg(g,nsofar,gin[pos],size[pos],nmax);
+        if (newsize >= nmin && ksofar+1 >= kmin && (kmin == 1 || ksofar >= 1))
         {
             if (!nooutput)
             {
@@ -199,8 +204,9 @@ assemble(graph *g, int nmin, int nmax, int sofar, int lastpos,
             }
             ++nout;
         }
-        assemble(g,nmin,nmax,newsize,pos,writeconn,outfile);
-        removeg(g,sofar,size[pos],nmax);
+        if (ksofar+1 < kmax)
+            assemble(g,nmin,nmax,newsize,ksofar+1,pos,kmin,kmax,outfile);
+        removeg(g,nsofar,size[pos],nmax);
     }
 }
 
@@ -212,20 +218,20 @@ main(int argc, char *argv[])
     char *infilename,*outfilename;
     FILE *infile,*outfile;
     boolean badargs,quiet;
-    boolean nswitch,cswitch,iswitch,Lswitch;
+    boolean nswitch,cswitch,iswitch,Lswitch,kswitch;
     boolean digraph;
     int j,mm,n,argnum;
     int codetype;
     graph *gread,*gout;
     char *arg,sw;
     double t;
-    long nmin,nmax,mmax,imin,imax;
+    long nmin,nmax,mmax,imin,imax,kmin,kmax;
 
     HELP; PUTVERSION;
 
     infilename = outfilename = NULL;
     badargs = FALSE;
-    nooutput = iswitch = nswitch = cswitch = quiet = Lswitch = FALSE;
+    nooutput = iswitch = nswitch = cswitch = quiet = kswitch = Lswitch = FALSE;
 
     argnum = 0;
     badargs = FALSE;
@@ -244,6 +250,7 @@ main(int argc, char *argv[])
                 else SWBOOLEAN('u',nooutput)
                 else SWRANGE('n',":-",nswitch,nmin,nmax,"assembleg -n")
                 else SWRANGE('i',":-",iswitch,imin,imax,"assembleg -i")
+                else SWRANGE('k',":-",kswitch,kmin,kmax,"assembleg -k")
                 else badargs = TRUE;
             }
         }
@@ -278,6 +285,11 @@ main(int argc, char *argv[])
             if (imin == imax) fprintf(stderr,"i%ld",imin);
             else fprintf(stderr,"i%ld:%ld",imin,imax);
         }
+        if (kswitch)
+        {
+            if (kmin == kmax) fprintf(stderr,"k%ld",kmin);
+            else fprintf(stderr,"k%ld:%ld",kmin,kmax);
+        }
         if (cswitch) fprintf(stderr,"c");
         if (Lswitch) fprintf(stderr,"L");
         if (argnum > 0) fprintf(stderr," %s",infilename);
@@ -288,7 +300,18 @@ main(int argc, char *argv[])
 
     if (!iswitch || imin <= 0) imin = 1;
     if (!iswitch || imax > nmax) imax = nmax;
-    if (!cswitch && imax == nmax) --imax;
+
+    if (cswitch && kswitch && kmin >= 2)
+        gt_abort(">E assembleg: -k option contradicts -c\n");
+    if (!kswitch)
+    {
+        if (cswitch) kmin = 1;
+        else         kmin = 2;
+        kmax = NAUTY_INFINITY / imin;
+    }
+    if (kmin <= 0) kmin = 1;
+    if (kmax > NAUTY_INFINITY) kmax = NAUTY_INFINITY;
+    if (kmin >= 2 && imax == nmax) --imax;
 
     if (infilename && infilename[0] == '-') infilename = NULL;
     infile = opengraphfile(infilename,&codetype,FALSE,1);
@@ -326,7 +349,8 @@ main(int argc, char *argv[])
         readsomeinputs(infile,(int)imin,(int)imax,(int)nmax/2,&gread,&n);
 
         EMPTYSET(gout,mmax*(size_t)nmax);
-        assemble(gout,(int)nmin,(int)nmax,0,0,cswitch,outfile);
+        assemble(gout,(int)nmin,(int)nmax,0,
+                                0,0,(int)kmin,(int)kmax,outfile);
 
         while (gread)
         {
@@ -335,7 +359,7 @@ main(int argc, char *argv[])
                 EMPTYSET(gout,mmax*(size_t)nmax);
                 insertg(gout,0,gread,n,(int)nmax);
     
-                if (n >= nmin && n <= nmax && cswitch)
+                if (n >= nmin && n <= nmax && kmin == 1)
                 {
                     if (!nooutput)
                     {
@@ -349,14 +373,16 @@ main(int argc, char *argv[])
                     ++nout;
                 }
 
-                assemble(gout,(int)nmin,(int)nmax,n,0,cswitch,outfile);
+                assemble(gout,(int)nmin,(int)nmax,n,
+                                1,0,(int)kmin,(int)kmax,outfile);
             }
             FREES(gread);
 
             if ((gread = readgg(infile,NULL,0,&mm,&n,&digraph)) == NULL) break;
             ++nin;
             if (digraph) outcode = DIGRAPH6;
-            if (n <= nmax/2) gt_abort(">E assembleg -L : inputs in bad order\n");
+            if (n <= nmax/2)
+                gt_abort(">E assembleg -L : inputs in bad order\n");
         }
     }
     else
@@ -364,7 +390,7 @@ main(int argc, char *argv[])
         readinputs(infile,(int)imin,(int)imax);
 
         EMPTYSET(gout,mmax*(size_t)nmax);
-        assemble(gout,(int)nmin,(int)nmax,0,0,cswitch,outfile);
+        assemble(gout,(int)nmin,(int)nmax,0,0,0,kmin,kmax,outfile);
     }
  
     t = CPUTIME - t;

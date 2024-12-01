@@ -1,7 +1,7 @@
 /* vcolg.c version 3.1; B D McKay, Apr 24, 2021 */
 
 #define USAGE \
-"vcolg [-q] [-u|-T|-o] [-e#|-e#:#] [-m#] [-c#,..,#] [-f#] [infile [outfile]]"
+"vcolg [-q] [-u|-T|-o|-O] [-e#|-e#:#] [-m#] [-c#,..,#] [-f#] [infile [outfile]]"
 
 #define HELPTEXT \
 "  Read graphs or digraphs and colour their vertices in\n\
@@ -20,6 +20,7 @@
     -T  Use a simple text output format (nv ne {col} {v1 v2})\n\
     -o  Use sparse6 (undirected) or digraph6 (directed) for output,\n\
           provided m=2 and the inputs have no loops.\n\
+    -O  Same as -o but use loops for weight 0, not weight 1\n\
     -u  no output, just count them\n\
     -q  suppress auxiliary information\n"
 
@@ -41,7 +42,7 @@ static int lastreject[MAXNV];
 static boolean lastrejok;
 static unsigned long groupsize;
 static unsigned long newgroupsize;
-static boolean Tswitch,oswitch;
+static boolean Tswitch,oswitch,Oswitch;
 
 static int fail_level;
 
@@ -132,16 +133,32 @@ writeone(FILE *outfile, graph *g, int *col, boolean digraph, int m, int n)
     int i;
     set *gi;
 
-    for (i = 0, gi = g; i < n; ++i, gi += m)
-        if (col[i] == 1) ADDELEMENT(gi,i);
+    if (Oswitch)
+    {
+        for (i = 0, gi = g; i < n; ++i, gi += m)
+            if (col[i] == 0) ADDELEMENT(gi,i);
+    }
+    else
+    {
+        for (i = 0, gi = g; i < n; ++i, gi += m)
+            if (col[i] == 1) ADDELEMENT(gi,i);
+    }
 
     if (digraph)
         writed6(outfile,g,m,n);
     else
         writes6(outfile,g,m,n);
 
-    for (i = 0, gi = g; i < n; ++i, gi += m)
-        if (col[i] == 1) DELELEMENT(gi,i);
+    if (Oswitch)
+    {
+        for (i = 0, gi = g; i < n; ++i, gi += m)
+            if (col[i] == 0) DELELEMENT(gi,i);
+    }
+    else
+    {
+        for (i = 0, gi = g; i < n; ++i, gi += m)
+            if (col[i] == 1) DELELEMENT(gi,i);
+    }
 }
 
 static int
@@ -564,7 +581,7 @@ main(int argc, char *argv[])
 
     nauty_check(WORDSIZE,1,1,NAUTYVERSIONID);
 
-    fswitch = Tswitch = oswitch = cswitch = dswitch = FALSE;
+    fswitch = Tswitch = oswitch = Oswitch = cswitch = dswitch = FALSE;
     uswitch = eswitch = mswitch = qswitch = Dswitch = FALSE;
     infilename = outfilename = NULL;
 
@@ -584,6 +601,7 @@ main(int argc, char *argv[])
                 else SWBOOLEAN('u',uswitch)
                 else SWBOOLEAN('T',Tswitch)
                 else SWBOOLEAN('o',oswitch)
+                else SWBOOLEAN('O',Oswitch)
                 else SWSEQUENCEMIN('c',",",cswitch,colcount,1,MAXNV,collen,"vcolg -c")
                 else SWSEQUENCEMIN('d',",",dswitch,mindeg,1,MAXNV,dlen,"vcolg -d")
                 else SWSEQUENCEMIN('D',",",Dswitch,maxdeg,1,MAXNV,Dlen,"vcolg -D")
@@ -608,18 +626,20 @@ main(int argc, char *argv[])
         exit(1);
     }
 
-    if ((Tswitch!=0) + (oswitch!=0) + (uswitch!=0) >= 2)
-        gt_abort(">E vcolg: -T, -o and -u are incompatible\n");
+    if ((Tswitch!=0) + (Oswitch!=0) + (oswitch!=0) + (uswitch!=0) >= 2)
+        gt_abort(">E vcolg: -T, -o, -O and -u are incompatible\n");
 
 #ifndef OUTPROC
-    if (!Tswitch && !oswitch && !uswitch)
-        gt_abort(">E vcolg: must use -T, -o or -u\n");
+    if (!Tswitch && !oswitch && !Oswitch && !uswitch)
+        gt_abort(">E vcolg: must use -T, -o, -O or -u\n");
 #endif
 
     if (!mswitch) numcols = 2;
 
+    if (Oswitch) oswitch = TRUE;
+
     if (oswitch && numcols != 2)
-        gt_abort(">E vcolg: -o is only allowed for 2 colours\n");
+        gt_abort(">E vcolg: -o and -O are only allowed for 2 colours\n");
 
     if (!eswitch)
     {

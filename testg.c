@@ -57,6 +57,8 @@
      -H#  number of induced cycles     -W#  number of 4-cycles\n\
      -E   Eulerian (all degrees are even, connectivity not required)\n\
      -a#  group size  -o# orbits  -F# fixed points  -t vertex-transitive\n\
+     -O#  number of orbits of edges    -OO# number of orbits of arcs\n\
+     -tt# 1 = edge transitive, 2 = arc transitive, 0 = neither\n\
      -c#  connectivity (2 means 2 or more).\n\
      -kk# #-tree, otherwise 0. The complete graph K_n is tabulated as\n\
            an n-tree, but matches either n-1 or n,\n\
@@ -98,7 +100,7 @@
 #include "nauconnect.h"
 
 /*
-Available letters: wy GIJO
+Available letters: wy GIJ
 
 How to add a new property:
 
@@ -248,106 +250,115 @@ static struct constraint_st    /* Table of Constraints */
 #define I_Z 15
    {'Z',FALSE,TRUE,FALSE,0,FALSE,FALSE,CMASK(I_z),
         -NOLIMIT,NOLIMIT,"diameter",NULL,0,FALSE,INTTYPE,0},
-#define I_a 16
+#define I_tt 16
+   {'t',TRUE,FALSE,FALSE,0,FALSE,FALSE,0,
+        -NOLIMIT,NOLIMIT,"edgetrans",NULL,0,FALSE,INTTYPE,0},
+#define I_O 17
+   {'O',FALSE,TRUE,FALSE,0,FALSE,FALSE,CMASK(I_tt),
+        -NOLIMIT,NOLIMIT,"edgeorbits",NULL,0,FALSE,INTTYPE,0},
+#define I_OO 18
+   {'O',TRUE,TRUE,FALSE,0,FALSE,FALSE,CMASK(I_tt),
+        -NOLIMIT,NOLIMIT,"arcorbits",NULL,0,FALSE,INTTYPE,0},
+#define I_a 19
    {'a',FALSE,TRUE,FALSE,0,FALSE,FALSE,0,
         -NOLIMIT,NOLIMIT,"groupsize",NULL,0,FALSE,GROUPSIZE,0},
-#define I_o 17
+#define I_o 20
    {'o',FALSE,TRUE,FALSE,0,FALSE,FALSE,CMASK(I_a),
         -NOLIMIT,NOLIMIT,"orbits",NULL,0,FALSE,INTTYPE,0},
-#define I_t 18
+#define I_t 21
    {'t',FALSE,TRUE,FALSE,0,FALSE,FALSE,CMASK(I_o),
         -NOLIMIT,NOLIMIT,"transitive",NULL,0,FALSE,BOOLTYPE,0},
-#define I_c 19
+#define I_c 22
    {'c',FALSE,FALSE,FALSE,0,FALSE,FALSE,0,
         -NOLIMIT,NOLIMIT,"connectivity",NULL,0,FALSE,INTTYPE,0},
-#define I_F 20
+#define I_F 23
    {'F',FALSE,TRUE,FALSE,0,FALSE,FALSE,CMASK(I_a),
         -NOLIMIT,NOLIMIT,"fixedpts",NULL,0,FALSE,INTTYPE,0},
-#define I_g 21
+#define I_g 24
    {'g',FALSE,FALSE,FALSE,0,FALSE,FALSE,0,
         -NOLIMIT,NOLIMIT,"girth",NULL,0,FALSE,INTTYPE,0},
-#define I_Y 22
+#define I_Y 25
    {'Y',FALSE,FALSE,FALSE,0,FALSE,FALSE,0,
         -NOLIMIT,NOLIMIT,"cycles",NULL,0,FALSE,INTTYPE,0},
-#define I_i 23
+#define I_i 26
    {'i',FALSE,FALSE,FALSE,0,FALSE,FALSE,0,
         -NOLIMIT,NOLIMIT,"minadjcn",NULL,0,FALSE,INTTYPE,0},
-#define I_ii 24
+#define I_ii 27
    {'i',TRUE,FALSE,FALSE,0,FALSE,FALSE,CMASK(I_i),
         -NOLIMIT,NOLIMIT,"maxadjcn",NULL,0,FALSE,INTTYPE,0},
-#define I_j 25
+#define I_j 28
    {'j',FALSE,FALSE,FALSE,0,FALSE,FALSE,CMASK(I_i),
         -NOLIMIT,NOLIMIT,"minnoncn",NULL,0,FALSE,INTTYPE,0},
-#define I_jj 26
+#define I_jj 29
    {'j',TRUE,FALSE,FALSE,0,FALSE,FALSE,CMASK(I_i),
         -NOLIMIT,NOLIMIT,"maxnoncn",NULL,0,FALSE,INTTYPE,0},
-#define I_T 27
+#define I_T 30
    {'T',FALSE,TRUE,FALSE,0,FALSE,FALSE,0,
         -NOLIMIT,NOLIMIT,"triang",NULL,0,FALSE,INTTYPE,0},
-#define I_K 28
+#define I_K 31
    {'K',FALSE,FALSE,FALSE,0,FALSE,FALSE,0,
         -NOLIMIT,NOLIMIT,"maxlcliq",NULL,0,FALSE,INTTYPE,0},
-#define I_H 29
+#define I_H 32
    {'H',FALSE,FALSE,FALSE,0,FALSE,FALSE,0,
         -NOLIMIT,NOLIMIT,"induced cycles",NULL,0,FALSE,INTTYPE,0},
-#define I_b 30
+#define I_b 33
    {'b',FALSE,FALSE,FALSE,0,FALSE,FALSE,0,
         -NOLIMIT,NOLIMIT,"bipartite",NULL,0,FALSE,BOOLTYPE,0},
-#define I_C 31
+#define I_C 34
    {'C',FALSE,TRUE,FALSE,0,FALSE,FALSE,0,
         -NOLIMIT,NOLIMIT,"strong",NULL,0,FALSE,BOOLTYPE,0},
-#define I_h 32
+#define I_h 35
    {'h',FALSE,FALSE,FALSE,0,FALSE,FALSE,CMASK(I_e),
         -NOLIMIT,NOLIMIT,"maxindset",NULL,0,FALSE,INTTYPE,0},
-#define I_k 33
+#define I_k 36
    {'k',FALSE,FALSE,FALSE,0,FALSE,FALSE,CMASK(I_e),
         -NOLIMIT,NOLIMIT,"maxclique",NULL,0,FALSE,INTTYPE,0},
-#define I_LL 34
+#define I_LL 37
    {'L',TRUE,TRUE,FALSE,0,FALSE,FALSE,CMASK(I_e),
         -NOLIMIT,NOLIMIT,"digons",NULL,0,FALSE,INTTYPE,0},
-#define I_cc 35
+#define I_cc 38
    {'c',TRUE,FALSE,FALSE,0,FALSE,FALSE,0,
         -NOLIMIT,NOLIMIT,"components",NULL,0,FALSE,INTTYPE,0},
-#define I_ee 36
+#define I_ee 39
    {'e',TRUE,TRUE,FALSE,0,FALSE,FALSE,CMASK(I_e),
         -NOLIMIT,NOLIMIT,"nonedges",NULL,0,FALSE,INTTYPE,0},
-#define I_TT 37
+#define I_TT 40
    {'T',TRUE,FALSE,FALSE,0,FALSE,FALSE,0,
         -NOLIMIT,NOLIMIT,"ind3sets",NULL,0,FALSE,INTTYPE,0},
-#define I_x 38
+#define I_x 41
    {'x',FALSE,TRUE,FALSE,0,FALSE,FALSE,0,
         -NOLIMIT,NOLIMIT,"sources",NULL,0,FALSE,INTTYPE,0},
-#define I_xx 39
+#define I_xx 42
    {'x',TRUE,TRUE,FALSE,0,FALSE,FALSE,CMASK(I_x),
         -NOLIMIT,NOLIMIT,"sinks",NULL,0,FALSE,INTTYPE,0},
-#define I_W 40
+#define I_W 43
    {'W',FALSE,FALSE,FALSE,0,FALSE,FALSE,0,
         -NOLIMIT,NOLIMIT,"squares",NULL,0,FALSE,INTTYPE,0},
-#define I_WW 41
+#define I_WW 44
    {'W',TRUE,FALSE,FALSE,0,FALSE,FALSE,0,
         -NOLIMIT,NOLIMIT,"diamonds",NULL,0,FALSE,INTTYPE,0},
-#define I_P 42
+#define I_P 45
    {'P',FALSE,FALSE,FALSE,0,FALSE,FALSE,0,
         -NOLIMIT,NOLIMIT,"pentagons",NULL,0,FALSE,INTTYPE,0},
-#define I_kk 43
+#define I_kk 46
    {'k',TRUE,FALSE,FALSE,0,FALSE,FALSE,0,
         -NOLIMIT,NOLIMIT,"ktree",NULL,0,FALSE,INTTYPE,0},
-#define I_N 44
+#define I_N 47
    {'N',FALSE,FALSE,FALSE,0,FALSE,FALSE,0,
         -NOLIMIT,NOLIMIT,"chrom","%d-colourable",0,FALSE,INTTYPE,0},
-#define I_NN 45
+#define I_NN 48
    {'N',TRUE,FALSE,FALSE,0,FALSE,FALSE,0,
         -NOLIMIT,NOLIMIT,"echrom","%d-edge colourable",0,FALSE,INTTYPE,0},
-#define I_A 46
+#define I_A 49
    {'A',FALSE,FALSE,FALSE,0,FALSE,FALSE,0,
         -NOLIMIT,NOLIMIT,"class",NULL,0,FALSE,INTTYPE,0},
-#define I_G 47
+#define I_G 50
    {'G',FALSE,TRUE,FALSE,0,FALSE,FALSE,0,
         -NOLIMIT,NOLIMIT,"connect","%d-connected",0,FALSE,INTTYPE,0},
-#define I_GG 48
+#define I_GG 51
    {'G',TRUE,TRUE,FALSE,0,FALSE,FALSE,0,
         -NOLIMIT,NOLIMIT,"econnect","%d-edge connected",0,FALSE,INTTYPE,0},
-#define I_Q 49
+#define I_Q 52
 #if defined(USERDEF) || defined(LUSERDEF)
    {'Q',FALSE,QDIGRAPH,FALSE,0,FALSE,FALSE,0,
         -NOLIMIT,NOLIMIT,USERDEFNAME,NULL,0,FALSE,INTTYPE,0}
@@ -863,6 +874,9 @@ compute(graph *g, int m, int n, int code, boolean digraph)
     int norbs,fixedpts;
     int minadj,maxadj,minnon,maxnon;
     int sources,sinks,lowneeded,highneeded;
+    size_t eorbits,aorbits;
+    double gs1;
+    int gs2;
 
     switch (code)
     {
@@ -961,6 +975,26 @@ compute(graph *g, int m, int n, int code, boolean digraph)
             VAL(I_F) = fixedpts;
             COMPUTED(I_a) = COMPUTED(I_o) = TRUE;
             COMPUTED(I_F) = COMPUTED(I_t) = TRUE;
+            break;
+
+        case I_tt:
+            countorbits(g,m,n,digraph,&gs1,&gs2,
+                &norbs,&fixedpts,&eorbits,&aorbits);
+            sz.groupsize1 = gs1;
+            sz.groupsize2 = gs2;
+            sz.size = sizeof(long) + sizeof(double);
+            splay_insert(&value_root,TRUE,TOSPLAY(&sz),sizeof(group_node));
+            VAL(I_a) = (value_t)value_root;
+            VAL(I_o) = norbs;
+            VAL(I_t) = norbs == 1;
+            VAL(I_F) = fixedpts;
+            VAL(I_O) = (value_t)eorbits;
+            VAL(I_OO) = (value_t)aorbits;
+            VAL(I_tt) = (aorbits == 1 ? 2 : eorbits == 1 ? 1 : 0);
+            COMPUTED(I_a) = COMPUTED(I_o) = TRUE;
+            COMPUTED(I_F) = COMPUTED(I_t) = TRUE;
+            COMPUTED(I_O) = COMPUTED(I_OO) = TRUE;
+            COMPUTED(I_tt) = TRUE;
             break;
 
         case I_c:

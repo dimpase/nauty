@@ -200,6 +200,8 @@ main(int argc, char *argv[])
             {
                 if (digraph) fprintf(stderr,
                        ">W writing digraph in undirected format\n");
+                if (outcode == GRAPH6 && numloops(g,m,n) > 0)
+                    fprintf(stderr,">W graph6 format doesn't allow loops\n");
                 if (outcode == SPARSE6) writes6(outfile,g,m,n);
                 else                    writeg6(outfile,g,m,n);
             }

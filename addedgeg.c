@@ -190,7 +190,7 @@ main(int argc, char *argv[])
 
     if (!Dswitch) maxdeg = NAUTY_INFINITY;
 
-    if (dolabel) nauty_check(WORDSIZE,1,1,NAUTYVERSIONID);
+    nauty_check(WORDSIZE,1,1,NAUTYVERSIONID);
 
     nin = nout = 0;
     t = CPUTIME;

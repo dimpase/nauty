@@ -38,7 +38,8 @@ static char* special[] =   /* Make sure to use \n */
     ">Z %d graphs read from stdin; %d written to stdout; %*f sec\n",
     "%d graphs altogether from %d read; cpu=%*f sec\n",
     ">A %*s %s\n",
-    ">Z %d posets written; %*f sec\n"
+    ">Z %d posets written; %*f sec\n",
+    ">Z %d graphs read from stdin, %d unique; %*f sec.\n"
 };
 #define NUMSPECIALS (sizeof(special)/sizeof(*special))
 

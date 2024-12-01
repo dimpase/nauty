@@ -5,7 +5,7 @@
 /* TODO: splitlevinc */
 
 #define USAGE \
- "gentreeg [-D#] [-Z#:#] [-ulps] [-q] n [res/mod] [file]"
+ "gentreeg [-D#] [-Z#:#] [-ulps] [-q] n|n1:n2 [res/mod] [file]"
 
 #define HELPTEXT \
 " Generate (unrooted) trees.\n\
@@ -407,11 +407,12 @@ Gen( int level, int p, int s, int cL, int h, int l, int n, int f, int g )
       splitcount = mod - 1;
   }
 
-  if (p > n) 
+  if (p > n) {
      if (f == 0) {
         if (good(p-1,h,0)) Gen(level+1, p, 2, p-2,h,n,nv,1,0); 
         if (good(p-1,h,1)) Gen(level+1, p, 2, p-3,h,n,nv,1,1);
      } else { WriteIt(level);}
+  }
   else {
      if (cL == 0) {
         if ( p< ub+2 ) par[p] = p-1;

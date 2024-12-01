@@ -17,6 +17,7 @@
               (the first vertex is number 0).\n\
     -m# Lower bound on minimum degree of output graphs.\n\
     -r# Choose # random sets of points (not necessarily different)\n\
+    -S# Set random number seed (taken from clock otherwise).\n\
     -a  The deleted points must be adjacent.\n\
     -b  The deleted points must be non-adjacent.\n\
     -i  Leave deleted vertices as isolates, not compatible with -m.\n\
@@ -268,7 +269,7 @@ main(int argc, char *argv[])
 {
     char *infilename,*outfilename;
     FILE *infile;
-    boolean badargs,quiet,dswitch,nswitch,vswitch,mswitch;
+    boolean badargs,quiet,dswitch,nswitch,vswitch,mswitch,Sswitch;
     boolean adj,nonadj,isolates,delrand;
     int i,j,m,n,v,argnum;
     int ndel,outmindeg;
@@ -279,6 +280,7 @@ main(int argc, char *argv[])
     setword *gv;
     long mindeg,maxdeg,irand,numrand;
     long minv,maxv;
+    unsigned long long seed;
     int iminv,imaxv,actmaxv,nvok;
     int degv;
     double t;
@@ -294,7 +296,7 @@ main(int argc, char *argv[])
     HELP; PUTVERSION;
 
     infilename = outfilename = NULL;
-    badargs = vswitch = mswitch = FALSE;
+    badargs = vswitch = mswitch = Sswitch = FALSE;
     dswitch = nswitch = quiet = FALSE;
     adj = nonadj = isolates = delrand = FALSE;
 
@@ -314,6 +316,7 @@ main(int argc, char *argv[])
                 else SWBOOLEAN('a',adj)
                 else SWBOOLEAN('b',nonadj)
                 else SWBOOLEAN('i',isolates)
+                else SWULL('S',Sswitch,seed,"ranlabg -S")
                 else SWINT('n',nswitch,ndel,">E delptg -n")
                 else SWRANGE('d',":-",dswitch,mindeg,maxdeg,">E delptg -d")
                 else SWRANGE('v',":-",vswitch,minv,maxv,">E delptg -v")
@@ -338,6 +341,12 @@ main(int argc, char *argv[])
     if (delrand && (adj || nonadj))
         gt_abort(">E delptg: -r is incompatible with -a and -b\n");
 
+    if (delrand)
+    {
+        if (!Sswitch) seed = INITRANBYTIME;
+        else          ran_init(seed);
+    }
+
     if (badargs)
     {
         fprintf(stderr,">E Usage: %s\n",USAGE);
@@ -355,7 +364,7 @@ main(int argc, char *argv[])
         if (nswitch) fprintf(stderr," -n%d",ndel);
         if (vswitch) fprintf(stderr," -v%ld:%ld",minv,maxv);
         if (mswitch) fprintf(stderr," -m%d",outmindeg);
-        if (delrand) fprintf(stderr," -r%ld",numrand);
+        if (delrand) fprintf(stderr," -r%ld -S%llu",numrand,seed);
         if (argnum > 0) fprintf(stderr," %s",infilename);
         if (argnum > 1) fprintf(stderr," %s",outfilename);
         fprintf(stderr,"\n");
@@ -384,7 +393,7 @@ main(int argc, char *argv[])
     if (!nswitch) ndel = 1;
     if (ndel == 1) adj = nonadj = FALSE;
 
-    if (dolabel) nauty_check(WORDSIZE,1,1,NAUTYVERSIONID);
+    nauty_check(WORDSIZE,1,1,NAUTYVERSIONID);
 
     nin = nout = 0;
     if (infilename && infilename[0] == '-') infilename = NULL;
@@ -461,8 +470,6 @@ main(int argc, char *argv[])
             for (i = 0; i < nvok; ++i)
                 ADDELEMENT(avail,okverts[i]);
         }
-
-        if (delrand) INITRANBYTIME;
 
         if (delrand)
         {

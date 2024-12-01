@@ -1,4 +1,4 @@
-/* labelg.c version 2.0; B D McKay, Jun 2015 */
+/* labelg.c version 2.1; B D McKay, Apr 2024 */
 
 #define USAGE "labelg [-q] [-sgz | -C#W#] [-fxxx] [-S|-t] \n\
                           [-i# -I#:# -K#] [infile [outfile]]"
@@ -28,17 +28,21 @@
 \n\
     The output file will have a header if and only if the input file does.\n\
 \n\
-    -fxxx  Specify a partition of the point set.  xxx is any\n\
+    -fxxx  Specify a partition of the vertex set.  xxx is any\n\
         string of ASCII characters except nul.  This string is\n\
         considered extended to infinity on the right with the\n\
-        character 'z'.  One character is associated with each point,\n\
-        in the order given.  The labelling used obeys these rules:\n\
-         (1) the new order of the points is such that the associated\n\
+        character 'z'. The sequence 'x^N', where x is a character and N is\n\
+        a number, is equivalent to writing 'x' N times.  One character is\n\
+        associated with each vertex, in the order given.  The labelling\n\
+        used obeys these rules:\n\
+         (1) the new order of the vertices is such that the associated\n\
         characters are in ASCII ascending order\n\
          (2) if two graphs are labelled using the same string xxx,\n\
         the output graphs are identical iff there is an\n\
         associated-character-preserving isomorphism between them.\n\
-        No option can be concatenated to the right of -f.\n\
+        If a leading '-' is used, as in -f-xxx, the characters are\n\
+        assigned to the vertices starting at the last vertex, and\n\
+        the new order of the vertices respects decreasing ASCII order.\n\
 \n\
     -i#  select an invariant (1 = twopaths, 2 = adjtriang(K), 3 = triples,\n\
         4 = quadruples, 5 = celltrips, 6 = cellquads, 7 = cellquins,\n\
@@ -50,12 +54,10 @@
 \n\
     -q  suppress auxiliary information\n"
 
-
 /*************************************************************************/
 
 #include "gtools.h"
 #include "nautinv.h"
-#include "gutils.h"
 #include "traces.h"
 
 static struct invarrec
@@ -181,8 +183,8 @@ main(int argc, char *argv[])
     if ((sswitch!=0) + (zswitch!=0) + (gswitch!=0) + (uswitch!=0) > 1)
         gt_abort(">E labelg: -szgu are incompatible\n");
 
-    if (tswitch && (fswitch || Sswitch))
-        gt_abort(">E labelg: -t is incompatible with -S and -f \n");
+    if (tswitch && Sswitch)
+        gt_abort(">E labelg: -t and -S are incompatible\n");
 
     if (iswitch && inv == 0) iswitch = FALSE;
 
@@ -345,6 +347,7 @@ main(int argc, char *argv[])
         traces_opts.writeautoms = FALSE;
         traces_opts.verbosity = 0;
         traces_opts.outfile = stdout;
+        traces_opts.defaultptn = FALSE;
         
         while (TRUE)
         {
@@ -353,7 +356,7 @@ main(int argc, char *argv[])
                 gt_abort(">E Traces does not allow loops or directed edges\n");
 #if MAXN
             if (sg.nv > MAXN)
-                gt_abort(">E shortg: graph larger than MAXN read\n");
+                gt_abort(">E labelg: graph larger than MAXN read\n");
 #endif
             ++nin;
             n = sg.nv;
@@ -365,8 +368,7 @@ main(int argc, char *argv[])
             sh.nde = sg.nde;
             if (n > 0)
             {
-                for (ii = 0; ii < n; ++ii) { lab[ii] = ii; ptn[ii] = 1; }
-                ptn[n-1] = 0;
+                setlabptnfmt(fmt,lab,ptn,NULL,0,n);
                 for (ii = 0; ii < secret; ++ii)
                     Traces(&sg,lab,ptn,orbits,&traces_opts,&traces_stats,&sh);
                 sortlists_sg(&sh);
@@ -389,14 +391,14 @@ main(int argc, char *argv[])
     {
         while (TRUE)
         {
-            if ((g = readgg(infile,NULL,0,&m,&n,&digraph)) == NULL) break;
+            if ((g = readg_loops(infile,
+                               NULL,0,&m,&n,&loops,&digraph)) == NULL) break;
 #if MAXN
             if (n > MAXN)
-                gt_abort(">E shortg: graph larger than MAXN read\n");
+                gt_abort(">E labelg: graph larger than MAXN read\n");
 #endif      
             ++nin;
             DYNALLOC2(graph,h,h_sz,n,m,"labelg");
-            loops = loopcount(g,m,n);
             for (ii = 0; ii < secret; ++ii)
                 fcanonise_inv(g,m,n,h,fmt,invarproc[inv].entrypoint,
                             mininvarlevel,maxinvarlevel,invararg,loops>0||digraph);

@@ -49,7 +49,7 @@ nextchar(FILE *f)
 
 static boolean
 readdimacsgraph(FILE *f, sparsegraph *g)
-/* Reads a graph from Bliss format into a sparse graph */
+/* Reads a graph from Dimacs format into a sparse graph */
 {
     int n,c;
     unsigned long ne,j;

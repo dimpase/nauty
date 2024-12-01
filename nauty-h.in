@@ -53,12 +53,33 @@ it is necessary to check they are correct.
 #endif
 
 /* Function noreturn attribute, if any */
-#define NORET_ATTR @ac_cv_noret@
+#define C_NORET_ATTR @ac_cv_noret@   /* Only for C */
+#if (defined(__cplusplus) && __cplusplus >= 202302L) \
+        || (!defined(__cplusplus) && __STDC_VERSION__ >= 202311L)
+#define NORET_ATTR [[noreturn]]
+#elif defined(__cplusplus) && __cplusplus >= 201103L
+#define NORET_ATTR [[_Noreturn]]
+#elif !defined(__cplusplus) && __STDC_VERSION__ >= 201112L
+#define NORET_ATTR _Noreturn
+#elif defined(__GNUC__)
+#define NORET_ATTR __attribute__((noreturn))
+#elif defined(_MSC_VER)
+#define NORET_ATTR __desclspec(noreturn)
+#else
+#define NORET_ATTR
+#endif
 
 #define USE_ANSICONTROLS @have_ansicontrols@ 
                           /* whether --enable-ansicontrols is used */
 #define FLEX_ARRAY_OK @flex_array_ok@
  /* whether the compiler supports flexible array members in structures */
+
+#define _FILE_OFFSET_BITS @ac_cv_sys_file_offset_bits@
+#if _FILE_OFFSET_BITS == 64
+#define _LARGEFILE_SOURCE
+#else
+#undef _FILE_OFFSET_BITS
+#endif
 
 /* Support of gcc extensions __builtin_clz, __builtin_clzl, __builtin_clzll */
 #ifndef HAVE_HWLZCNT
@@ -313,6 +334,7 @@ it is necessary to check they are correct.
 *          Jun-23 : Added support for WORDSIZE=128                           *
 *        7-Aug-23 : Added FILLSET and SETSIZE macros                         *
 *       11-Nov-23 : Added NORET_ATTR noreturn attribute for functions        *
+*        9-Feb-24 : Removed groupsize1, groupsize2 and outofspace #defines   *
 *                                                                            *
 * @edit_msg@
 *                                                                            *
@@ -561,7 +583,7 @@ typedef unsigned long long nauty_counter;
 #define COUNTER_FMT_RAW "llu"
 #define PRINT_COUNTER(f,x) fprintf(f,COUNTER_FMT,x)
 
-#define NAUTYVERSIONID (28080+HAVE_TLS)  /* 10000*version + HAVE_TLS */
+#define NAUTYVERSIONID (28090+HAVE_TLS)  /* 10000*version + HAVE_TLS */
 #define NAUTYREQUIRED NAUTYVERSIONID  /* Minimum compatible version */
 
 #if WORDSIZE==16
@@ -1077,12 +1099,12 @@ typedef struct
 {
     double grpsize1;        /* size of group is */
     int grpsize2;           /*    grpsize1 * 10^grpsize2 */
-#define groupsize1 grpsize1     /* for backwards compatibility */
-#define groupsize2 grpsize2
+/* #define groupsize1 grpsize1     for backwards compatibility */
+/* #define groupsize2 grpsize2     for backwards compatibility */
     int numorbits;          /* number of orbits in group */
     int numgenerators;      /* number of generators found */
     int errstatus;          /* if non-zero : an error code */
-#define outofspace errstatus;   /* for backwards compatibility */
+/* #define outofspace errstatus;   for backwards compatibility */
     unsigned long numnodes;      /* total number of nodes */
     unsigned long numbadleaves;  /* number of leaves of no use */
     int maxlevel;                /* maximum depth of search */
@@ -1442,7 +1464,7 @@ int leftbit[] =   {8,7,6,6,5,5,5,5,4,4,4,4,4,4,4,4,
 extern "C" {
 #endif
 
-extern void alloc_error(const char*);
+extern void NORET_ATTR alloc_error(const char*);
 extern void breakout(int*,int*,int,int,int,set*,int);
 extern boolean cheapautom(int*,int,boolean,int);
 extern void doref(graph*,int*,int*,int,int*,int*,int*,set*,int*,

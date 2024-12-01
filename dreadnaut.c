@@ -104,6 +104,7 @@
 *                 - most errors cause rest of input line to be skipped       *
 *       19-Feb-16 - make R command induce a partition if one is defined      *
 *       17-Feb-23 - increase WORKSIZE                                        *
+*        2-Apr-24 - allow undirected graphs to have loops                    *
 *                                                                            *
 *****************************************************************************/
 
@@ -388,7 +389,7 @@ main(int argc, char *argv[])
     boolean ranreg,same;
     char *s1,*s2;
     int c,d;
-    unsigned long uli;
+    unsigned long long uli;
     size_t sli;
     set *gp;
     double timebefore,timeafter,mintime;
@@ -399,9 +400,13 @@ main(int argc, char *argv[])
     permnode *generators;
     char *ap,*parameters;
     boolean flushing;
+    int loops;
 
     HELP; PUTVERSION;
 
+#if HAVE_ERRNO_H
+    errno = 0;
+#endif
     parameters = NULL;
     if (argc == 1)
         parameters = "";
@@ -679,6 +684,7 @@ main(int argc, char *argv[])
     }
 
     minus = FALSE;
+    loops = 0;
     while (curfile >= 0)
     {
         if ((c = getc(INFILE)) == EOF || c == '\004')
@@ -812,6 +818,7 @@ main(int argc, char *argv[])
                 cvalid_sg = FALSE;
                 pvalid = FALSE;
                 ovalid = FALSE;
+                loops = 0;
                 n = i;
                 m = SETWORDSNEEDED(n);
                 freeschreier(NULL,&generators); 
@@ -831,6 +838,7 @@ main(int argc, char *argv[])
             {
                 readgraph_sg(INFILE,&g_sg,options_digraph,prompt,
                              options_linelength,n);
+                loops = numloops_sg(&g_sg);
                 gvalid_sg = TRUE;
                 cvalid_sg = FALSE;
             }
@@ -841,6 +849,7 @@ main(int argc, char *argv[])
 #endif
                 readgraph(INFILE,g,options_digraph,prompt,FALSE,
                           options_linelength,m,n);
+                loops = numloops(g,m,n);
                 gvalid = TRUE;
                 cvalid = FALSE;
             }
@@ -858,6 +867,7 @@ main(int argc, char *argv[])
             {
                 readgraph(INFILE,g,options_digraph,prompt,gvalid,
                           options_linelength,m,n);
+                loops = numloops(g,m,n);
                 gvalid = TRUE;
                 cvalid = FALSE;
                 ovalid = FALSE;
@@ -871,8 +881,7 @@ main(int argc, char *argv[])
             {
                 if (d == '&')
                 {
-                    if (pvalid)
-                        relabel_sg(&g_sg,lab,lab,&canong_sg);
+                    if (pvalid) relabel_sg(&g_sg,lab,lab,&canong_sg);
                 }
                 else
                 {
@@ -913,6 +922,7 @@ main(int argc, char *argv[])
             break;
 
         case 'R':   /* form subgraph */
+//LOOPS
             if (gvalid)
             {
 #if !MAXN
@@ -939,6 +949,7 @@ main(int argc, char *argv[])
                 cvalid = FALSE;
                 ovalid = FALSE;
                 m = SETWORDSNEEDED(n);
+                loops = numloops(g,m,n);
             }
             else if (gvalid_sg)
             {
@@ -962,6 +973,7 @@ main(int argc, char *argv[])
                 }
                 cvalid_sg = FALSE;
                 ovalid = FALSE;
+                loops = numloops_sg(&g_sg);
                 m = SETWORDSNEEDED(n);
             }
             else
@@ -984,7 +996,11 @@ main(int argc, char *argv[])
             else if (gvalid)
             {
                 if (d == '_') converse(g,m,n);
-                else          complement(g,m,n);
+                else
+                {
+                    complement(g,m,n);
+                    if (loops > 0) loops = n - loops;
+                }
                 cvalid = FALSE;
             }
             else
@@ -999,6 +1015,7 @@ main(int argc, char *argv[])
                 {
                     copy_sg(&g_sg,&canong_sg);
                     complement_sg(&canong_sg,&g_sg);
+                    if (loops > 0) loops = n - loops;
                     cvalid_sg = FALSE;
                 }
             }
@@ -1195,16 +1212,20 @@ main(int argc, char *argv[])
                 DYNALLOC2(graph,g,g_sz,newn,newm,"dreadnaut");
 #endif
                 mathon(canong,m,n,g,newm,newn);
+                loops = numloops(g,m,n);
                 m = newm;
                 n = newn;
+                loops = 0;
                 cvalid = FALSE;
             }
             else if (gvalid_sg)
             {
                 copy_sg(&g_sg,&canong_sg);
                 mathon_sg(&canong_sg,&g_sg);
+                loops = numloops_sg(&g_sg);
                 m = newm;
                 n = newn;
+                loops = 0;
                 cvalid_sg = FALSE;
             }
             break;
@@ -1263,6 +1284,7 @@ main(int argc, char *argv[])
                     freeschreier(NULL,&generators);
                 }
             }
+            loops = 0;
             break;
 
         case 'q':   /* quit */
@@ -1485,6 +1507,8 @@ main(int argc, char *argv[])
                 setsigcatcher(); 
                 for (;;)
                 {
+                    if (loops > 0) fprintf(ERRFILE,
+                  "Warning: Traces is not certified for graphs with loops\n");
                     traces_opts.defaultptn = !pvalid;
                     Traces(&g_sg,lab,tempptn,orbits,&traces_opts,&traces_stats,
                        &canong_sg);
@@ -1569,7 +1593,7 @@ main(int argc, char *argv[])
                         options.defaultptn = TRUE;
 
                     options.outfile = outfile;
-                    options.digraph = options_digraph;
+                    options.digraph = (options_digraph || loops > 0);
                     options.cartesian = options_cartesian;
                     options.schreier = (options_schreier > 0);
                     options.getcanon = options_getcanon;
@@ -1791,6 +1815,7 @@ main(int argc, char *argv[])
                 ungetc(d,INFILE);
                 gvalid = gvalid_sg = FALSE;
                 pvalid = ovalid = FALSE;
+                loops = 0;
             }
             else
             {
@@ -2309,14 +2334,18 @@ main(int argc, char *argv[])
             {
                 uli = 0;
                 for (i = 0, gp = g; i < n; ++i, gp += m) uli += setsize(gp,m);
-                if (options_digraph) fprintf(outfile," arcs=%lu",uli);
-                else                 fprintf(outfile," edges=%lu",uli/2);
+                if (options_digraph) fprintf(outfile," arcs=%llu",uli);
+                else           fprintf(outfile," edges=%llu",(uli+loops)/2);
+                if (loops > 0) fprintf(outfile," loops=%d",loops);
+if (loops != numloops(g,m,n)) gt_abort_2(">E loops=%d actual=%d\n",loops,numloops(g,m,n));
             }
             else
             {
                 uli = g_sg.nde;
-                if (options_digraph) fprintf(outfile," arcs=%lu",uli);
-                else                 fprintf(outfile," edges=%lu",uli/2);
+                if (options_digraph) fprintf(outfile," arcs=%llu",uli);
+                else           fprintf(outfile," edges=%llu",(uli+loops)/2);
+                if (loops > 0) fprintf(outfile," loops=%d",loops);
+if (loops != numloops_sg(&g_sg)) gt_abort_2(">E loops=%d actual=%d\n",loops,numloops_sg(&g_sg));
             }
             fprintf(outfile," options=(%cc%ca%cm%cp%cd",
                         PM(options_getcanon),PM(options_writeautoms),

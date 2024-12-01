@@ -1,7 +1,7 @@
-/* productg.c  version 1.2; B D McKay, October 2022. */
+/* productg.c  version 1.3; B D McKay, March 2024. */
 /* TODO:  Rooted product */
 
-#define USAGE "productg [-c|-l|-L|-k|-t|-a#] [infile [outfile]]"
+#define USAGE "productg [-u|-c|-l|-L|-k|-t|-a#] [infile [outfile]]"
 
 #define HELPTEXT \
 " Read two graphs in graph6/sparse6 format and write their product\n\
@@ -17,7 +17,11 @@
         Add these values giving the condition for an edge:\n\
    Code:    400  200   100   040 020 010      004   002    001\n\
    Graph1: same same  same   adj adj adj    nonadj nonadj nonadj\n\
-   Graph2: same  adj nonadj same adj nonadj  same   adj   nonadj\n"
+   Graph2: same  adj nonadj same adj nonadj  same   adj   nonadj\n\
+\n\
+  -u : Disjoint union\n\
+\n\
+  -q : Suppress informative output\n"
 
 /*************************************************************************/
 
@@ -120,17 +124,19 @@ main(int argc, char *argv[])
     boolean badargs;
     int i,j,m1,n1,m2,n2,argnum;
     int codetype;
-    graph *g1,*g2;
+    graph *g1,*g2,*gi;
         char *arg,sw;
     int nv,v1,v2,w1,w2;
-    boolean aswitch,cswitch,lswitch,Lswitch,tswitch,kswitch;
-    boolean digraph,dreadnaut;
+    long long nvlong;
+    boolean aswitch,cswitch,lswitch,Lswitch,tswitch,kswitch,uswitch;
+    boolean quiet,digraph,dreadnaut;
     int adjcode;
     SG_DECL(sg);
     int *d,*e,xx,yy;
-    size_t *v,twone;
+    size_t *v,t,twone,epos;
 
-    aswitch = cswitch = lswitch = Lswitch = tswitch = kswitch = FALSE;
+    uswitch = aswitch = cswitch = lswitch = FALSE;
+    Lswitch = tswitch = kswitch = quiet = FALSE;
     dreadnaut = FALSE;
 
     HELP; PUTVERSION;
@@ -154,7 +160,9 @@ main(int argc, char *argv[])
                 else SWBOOLEAN('l',lswitch)
                 else SWBOOLEAN('L',Lswitch)
                 else SWBOOLEAN('k',kswitch)
+                else SWBOOLEAN('u',uswitch)
                 else SWBOOLEAN('d',dreadnaut)
+                else SWBOOLEAN('q',quiet)
                 else SWOCT('a',aswitch,adjcode,"productg -a")
                 else
                    badargs = TRUE;
@@ -177,10 +185,10 @@ main(int argc, char *argv[])
     }
 
     if ((aswitch!=0) + (cswitch!=0) + (lswitch!=0)  + (kswitch!=0) 
-             + (Lswitch!=0) + (tswitch!=0) + (aswitch!=0) != 1)
+         + (Lswitch!=0) + (tswitch!=0) + (aswitch!=0) + (uswitch!= 0) != 1)
     {
         fprintf(stderr,
-                ">E productg: exactly one of -k,-c,-l,-L,-t,-a# is needed\n");
+            ">E productg: exactly one of -u, -k,-c,-l,-L,-t,-a# is needed\n");
         exit(1);
     }
 
@@ -211,12 +219,75 @@ main(int argc, char *argv[])
         gt_abort(">E second graph not found\n");
     if (digraph) gt_abort(">E productg does not support digraphs yet.\n");
 
-    if ((long)n1 * (long)n2 > NAUTY_INFINITY-2)
+    if (uswitch)
+        nvlong = (long long)n1 + (long long)n2;
+    else
+        nvlong = (long long)n1 * (long long)n2;
+
+    if (nvlong > NAUTY_INFINITY-2)
         gt_abort(">E product would be too large\n");
 
-    if (dreadnaut)
+    nv = (int)nvlong;
+
+    if (uswitch)
     {
-        fprintf(outfile,"n=%ld $=0 g\n",n1*(long)n2);
+        if (dreadnaut)
+        {
+            fprintf(outfile,"n=%d $=0 g\n",nv);
+            for (v1 = 0, gi = g1; v1 < n1; ++v1, gi += m1)
+            {
+                fprintf(outfile,"%d:",v1);
+                for (w1 = v1; (w1 = nextelement(gi,m1,w1)) >= 0;)
+                    fprintf(outfile," %d",w1);
+                fprintf(outfile,"\n");
+            }
+            for (v2 = 0, gi = g2; v2 < n2; ++v2, gi += m2)
+            {
+                fprintf(outfile,"%d:",n1+v2);
+                for (w2 = v2; (w2 = nextelement(gi,m1,w2)) >= 0;)
+                    fprintf(outfile," %d",n1+w2);
+                fprintf(outfile,"\n");
+            }
+            fprintf(outfile,". $$\n");
+        }
+        else
+        {
+            twone = 0;
+            for (t = 0; t < (size_t)m1*(size_t)n1; ++t)
+                twone += POPCOUNT(g1[t]);
+            for (t = 0; t < (size_t)m2*(size_t)n2; ++t)
+                twone += POPCOUNT(g2[t]);
+            SG_ALLOC(sg,nv,twone,"productg");
+
+            epos = 0;
+            for (v1 = 0, gi = g1; v1 < n1; ++v1, gi += m1)
+            {
+                sg.v[v1] = epos;
+                sg.d[v1] = 0;
+                for (w1 = -1; (w1 = nextelement(gi,m1,w1)) >= 0;)
+                {
+                    sg.e[epos++] = w1;
+                    ++sg.d[v1];
+                }
+            }
+            for (v2 = 0, gi = g2; v2 < n2; ++v2, gi += m2)
+            {
+                sg.v[n1+v2] = epos;
+                sg.d[n1+v2] = 0;
+                for (w2 = -1; (w2 = nextelement(gi,m2,w2)) >= 0;)
+                {
+                    sg.e[epos++] = n1+w2;
+                    ++sg.d[n1+v2];
+                }
+            }
+            sg.nv = nv;
+            sg.nde = twone;
+            writes6_sg(outfile,&sg);
+        }
+    }
+    else if (dreadnaut)
+    {
+        fprintf(outfile,"n=%d $=0 g\n",nv);
 
         for (v1 = 0; v1 < n1; ++v1)
         for (v2 = 0; v2 < n2; ++v2)
@@ -234,7 +305,6 @@ main(int argc, char *argv[])
     }
     else
     {
-        nv = n1*n2;
         SG_ALLOC(sg,nv,0,"productg");
         v = sg.v;
         d = sg.d;
@@ -286,8 +356,8 @@ main(int argc, char *argv[])
         writes6_sg(outfile,&sg);
     }
 
-    fprintf(stderr,">Z Wrote graph of order %d to %s\n",
-                       n1*n2,outfilename);
+    if (!quiet)
+        fprintf(stderr,">Z Wrote graph of order %d to %s\n",nv,outfilename);
 
     exit(0);
 }

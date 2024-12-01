@@ -37,6 +37,8 @@ used, it is necessary to check they are correct.
 #define ALLOW_INTERRUPT @allow_interrupt@ /* no --disable-interrupt */
 #define HAVE_GUNZIP @have_gunzip@ /* gunzip program is available */
 
+#define HAVE_CRYPTO @have_crypto@  /* crypto library available */
+
 /* @edit_msg@ */
 
 /*==================================================================*/
@@ -260,6 +262,7 @@ extern void stringtograph_inc(char*,graph*,int,graph*,int);
 extern size_t edgecount(char*);
 extern int checkgline(char*);
 extern graph *readgg(FILE*,graph*,int,int*,int*,boolean*);
+extern graph *readg_loops(FILE*,graph*,int,int*,int*,int*,boolean*);
 extern graph *readg(FILE*,graph*,int,int*,int*);
 extern graph *readgg_inc(FILE*,graph*,int,int*,int*,graph*,int,int,boolean*);
 extern graph *readg_inc(FILE*,graph*,int,int*,int*,graph*,int,int);
@@ -312,6 +315,7 @@ extern void fcanonise_inv_sg
              int,int,int,int*,int,boolean,int,int),int,int,int,boolean);
 extern void setlabptn(int*,int*,int*,int);
 extern int breakcellwt(int*,int*,int*,int,int);
+extern int setlabptnfmt(char*,int*,int*,set*,int,int);
 
 extern void fgroup(graph*,int,int,char*,int*,int*);
 extern void fgroup_inv
@@ -319,6 +323,8 @@ extern void fgroup_inv
                 int,int,int*,int,boolean,int,int),int,int,int);
 extern int istransitive(graph*,int,int,graph*);
 extern void tg_canonise(graph*,graph*,int,int);
+extern void countorbits(graph*,int,int,boolean,double*,int*,
+         int*,int*,size_t*,size_t*);
 
 extern TLS_ATTR int readg_code;
 extern TLS_ATTR char *readg_line;

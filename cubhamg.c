@@ -8,6 +8,7 @@
 
 #define HELPTEXT \
 " cubhamg : Find hamiltonian cycles in sub-cubic graphs\n" \
+"    Graphs that are not hamiltonian, or not solved, are written out\n" \
 "    infile is the name of the input file in graph6/sparse6 format\n" \
 "    outfile is the name of the output file in the same format\n" \
 "\n" \

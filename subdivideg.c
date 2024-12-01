@@ -1,10 +1,15 @@
-/* subdivideg.c  version 1.1; B D McKay, Oct 2017. */
+/* xsubdivideg.c  version 1.1; B D McKay, Oct 2017. */
 
-#define USAGE "subdivideg [-k#] [-q] [infile [outfile]]"
+#define USAGE "xsubdivideg [-k#] [-i] [-q] [infile [outfile]]"
 
 #define HELPTEXT \
-" Make the subdivision graphs of a file of graphs.\n\
+" Make the subdivision graphs of a file of graphs, or the inverse operation.\n\
     -k#  Subdivide each edge by # new vertices (default 1)\n\
+    -i   Perform homeomorphic series reduction\n\
+         For undirected graphs, repeatedly replace x--y--z by x--z if\n\
+            x,y are not adjacent and y has no other neighbours.\n\
+         For digraphs, repeatedly replace x->y->z by x->z if x,z are\n\
+            distinct, x->z is not present, and y has no other neighbours.\n\
 \n\
     The output file has a header if and only if the input file does.\n\
 \n\
@@ -13,6 +18,206 @@
 /*************************************************************************/
 
 #include "gtools.h" 
+
+/**************************************************************************/
+
+static void
+smoothdigraph(sparsegraph *g)
+/* Smooth out vertices of degree 2 without making loops or double edges */
+{
+    int *e,*d,i,j,n,newn;
+    int j1,j2;
+    size_t *v,hhi,hi,llo,lo,mid;
+    DYNALLSTAT(int,newlab,newlab_sz);
+    DYNALLSTAT(int,innbr,innbr_sz);
+
+    sortlists_sg(g);
+    SG_VDE(g,v,d,e);
+    n = g->nv;
+    DYNALLOC1(int,newlab,newlab_sz,n,"subdivideg");
+    DYNALLOC1(int,innbr,innbr_sz,n,"subdivideg");
+
+    for (i = 0; i < n; ++i) innbr[i] = -1;
+
+   /* innbr[i] := j if j is the sole in-nbr of i */
+
+    for (i = 0; i < n; ++i)
+    {
+        lo = v[i];
+        hi = lo + d[i];
+        for (mid = lo; mid < hi; ++mid)
+        {
+            j = e[mid];
+            if (innbr[j] >= 0) innbr[j] = -2;
+            else if (innbr[j] == -1) innbr[j] = i;
+        }
+    }
+
+    newn = 0;
+    for (i = 0; i < n; ++i)
+    {
+        if (d[i] == 1 && innbr[i] >= 0 && innbr[i] != e[v[i]])
+        {
+            j1 = innbr[i];
+            j2 = e[v[i]];
+            lo = v[j1] + 1;     /* Offset by 1 so hi<0 is impossible */
+            hi = v[j1] + d[j1];
+
+            while (lo <= hi)
+            {
+                mid = lo + (hi-lo)/2;
+                if (e[mid-1] == j2)     break;
+                else if (e[mid-1] < j2) lo = mid+1;
+                else                    hi = mid-1;
+            }
+            if (lo <= hi)           /* adjacent */
+            {
+                newlab[i] = newn++;
+                continue;
+            }
+            newlab[i] = -1;
+
+            lo = llo = v[j1];
+            hi = hhi = v[j1] + d[j1] - 1;
+            while (lo <= hi)
+            {
+                mid = lo + (hi-lo)/2;
+                if (e[mid] == i)     break;
+                else if (e[mid] < i) lo = mid+1;
+                else                 hi = mid-1;
+            }
+            while (mid > llo && e[mid-1] > j2)
+            {
+                e[mid] = e[mid-1];
+                --mid;
+            }
+            while (mid < hhi && e[mid+1] < j2)
+            {
+                e[mid] = e[mid+1];
+                ++mid;
+            }
+            e[mid] = j2;
+            if (innbr[j2] >= 0) innbr[j2] = j1;
+        }
+        else
+            newlab[i] = newn++;
+    }
+
+    for (i = 0; i < n; ++i)
+    {
+        j = newlab[i];
+        if (j >= 0)
+        {
+            d[j] = d[i];
+            v[j] = v[i];
+            for (mid = v[j]; mid < v[j]+d[j]; ++mid)
+                e[mid] = newlab[e[mid]];
+        }
+    }
+
+    g->nv = newn;
+    g->nde -= (n-newn);
+}
+
+static void
+smoothgraph(sparsegraph *g)
+/* Smooth out vertices of degree 2 without making loops or double edges */
+{
+    int *e,*d,i,j,n,newn;
+    int j1,j2;
+    size_t *v,hhi,hi,llo,lo,mid;
+    DYNALLSTAT(int,newlab,newlab_sz);
+
+    sortlists_sg(g);
+    SG_VDE(g,v,d,e);
+    n = g->nv;
+    DYNALLOC1(int,newlab,newlab_sz,n,"subdivideg");
+
+    newn = 0;
+    for (i = 0; i < n; ++i)
+    {
+        if (d[i] == 2)
+        {
+            j1 = e[v[i]];
+            j2 = e[v[i]+1];
+            lo = v[j1] + 1;     /* Offset by 1 so hi<0 is impossible */
+            hi = v[j1] + d[j1];
+
+            while (lo <= hi)
+            {
+                mid = lo + (hi-lo)/2;
+                if (e[mid-1] == j2)     break;
+                else if (e[mid-1] < j2) lo = mid+1;
+                else                    hi = mid-1;
+            }
+            if (lo <= hi)           /* adjacent */
+            {
+                newlab[i] = newn++;
+                continue;
+            }
+            newlab[i] = -1;
+
+            lo = llo = v[j1];
+            hi = hhi = v[j1] + d[j1] - 1;
+            while (lo <= hi)
+            {
+                mid = lo + (hi-lo)/2;
+                if (e[mid] == i)     break;
+                else if (e[mid] < i) lo = mid+1;
+                else                 hi = mid-1;
+            }
+            while (mid > llo && e[mid-1] > j2)
+            {
+                e[mid] = e[mid-1];
+                --mid;
+            }
+            while (mid < hhi && e[mid+1] < j2)
+            {
+                e[mid] = e[mid+1];
+                ++mid;
+            }
+            e[mid] = j2;
+
+            lo = llo = v[j2];
+            hi = hhi = v[j2] + d[j2] - 1;
+            while (lo <= hi)
+            {
+                mid = lo + (hi-lo)/2;
+                if (e[mid] == i)     break;
+                else if (e[mid] < i) lo = mid+1;
+                else                 hi = mid-1;
+            }
+            while (mid > llo && e[mid-1] > j1)
+            {
+                e[mid] = e[mid-1];
+                --mid;
+            }
+            while (mid < hhi && e[mid+1] < j1)
+            {
+                e[mid] = e[mid+1];
+                ++mid;
+            }
+            e[mid] = j1;
+        }
+        else
+            newlab[i] = newn++;
+    }
+
+    for (i = 0; i < n; ++i)
+    {
+        j = newlab[i];
+        if (j >= 0)
+        {
+            d[j] = d[i];
+            v[j] = v[i];
+            for (mid = v[j]; mid < v[j]+d[j]; ++mid)
+                e[mid] = newlab[e[mid]];
+        }
+    }
+            
+    g->nv = newn;
+    g->nde -= (size_t)2*(n-newn);
+}
 
 /**************************************************************************/
 
@@ -182,10 +387,11 @@ main(int argc, char *argv[])
 {
     char *infilename,*outfilename;
     FILE *infile,*outfile;
-    boolean badargs,quiet,kswitch,digraph;
+    boolean badargs,quiet,kswitch,digraph,inverse;
     int j,argnum,kvalue,nloops;
     int codetype,outcode;
     SG_DECL(g); SG_DECL(h);
+    sparsegraph *gh;
     nauty_counter nin;
     char *arg,sw;
     double t;
@@ -193,7 +399,7 @@ main(int argc, char *argv[])
     HELP; PUTVERSION;
 
     infilename = outfilename = NULL;
-    quiet = kswitch = FALSE;
+    quiet = kswitch = inverse = FALSE;
     kvalue = 1;
 
     argnum = 0;
@@ -208,6 +414,7 @@ main(int argc, char *argv[])
             {
                 sw = *arg++;
                 SWBOOLEAN('q',quiet)
+                SWBOOLEAN('i',inverse)
                 else SWINT('k',kswitch,kvalue,"subdivideg -k")
                 else badargs = TRUE;
             }
@@ -228,10 +435,14 @@ main(int argc, char *argv[])
         exit(1);
     }
 
+    if (kswitch && inverse)
+        gt_abort(">E subdivideg: -i and -k are incompatible\n");
+
     if (!quiet)
     {
         fprintf(stderr,">A subdivideg");
         if (kswitch) fprintf(stderr," -k%d",kvalue);
+        if (inverse) fprintf(stderr," -i");
         if (argnum > 0) fprintf(stderr," %s",infilename);
         if (argnum > 1) fprintf(stderr," %s",outfilename);
         fprintf(stderr,"\n");
@@ -266,12 +477,22 @@ main(int argc, char *argv[])
     {
         ++nin;
 
-        if (digraph) subdivisiondigraph(&g,kvalue,&h);
-        else         subdivisiongraph(&g,kvalue,&h);
+        if (inverse)
+        {
+            if (digraph) smoothdigraph(&g);
+            else         smoothgraph(&g);
+            gh = &g;
+        }
+        else
+        {
+            if (digraph) subdivisiondigraph(&g,kvalue,&h);
+            else         subdivisiongraph(&g,kvalue,&h);
+            gh = &h;
+        }
 
-        if (digraph)                 writed6_sg(outfile,&h);
-        else if (outcode == SPARSE6) writes6_sg(outfile,&h);
-        else                         writeg6_sg(outfile,&h);
+        if (digraph)                 writed6_sg(outfile,gh);
+        else if (outcode == SPARSE6) writes6_sg(outfile,gh);
+        else                         writeg6_sg(outfile,gh);
     }
     t = CPUTIME - t;
 

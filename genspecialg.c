@@ -23,7 +23,7 @@
                    minus a matching of given size if present\n\
     -m#,#... : multipartite graph\n\
     -a#   : antiprism (directed antiprism) on 2n\n\
-    -l#   : moebius ladder (directed cycle, undirected rungs) with # rungs\n\
+    -l#   : moebius ladder (directed cycle, undirected rungs) with # vertices\n\
     -D#,# : de Bruijn graph (digraph). D(m,t) has order m^t\n\
     -w#   : wheel with # spokes (directed out from hub)\n\
     -f#   : flower snark on 4n vertices\n\
